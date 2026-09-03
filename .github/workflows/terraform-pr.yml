@@ -60,7 +60,7 @@ jobs:
 
       - name: Terraform Format Check
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform fmt -check -recursive
+        run: terraform fmt -recursive
 
       # ==================================================
       # TERRAFORM INIT
