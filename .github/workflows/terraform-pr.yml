@@ -1,0 +1,132 @@
+name: Terraform PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_WORKING_DIR: environments/dev
+  AWS_REGION: us-east-1
+
+jobs:
+
+  terraform-checks:
+
+    name: Terraform Checks
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==================================================
+      # CHECKOUT
+      # ==================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ==================================================
+      # TERRAFORM
+      # ==================================================
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      # ==================================================
+      # AWS OIDC
+      # ==================================================
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::351554785424:role/ctl-github-terraform-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      # ==================================================
+      # TERRAFORM FMT
+      # ==================================================
+
+      - name: Terraform Format Check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      # ==================================================
+      # TERRAFORM INIT
+      # ==================================================
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      # ==================================================
+      # TERRAFORM VALIDATE
+      # ==================================================
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate -no-color
+
+      # ==================================================
+      # TFLINT
+      # ==================================================
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v5
+        with:
+          tflint_version: latest
+
+      - name: Initialize TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: tflint --config=../../.tflint.hcl
+
+      # ==================================================
+      # CHECKOV
+      # ==================================================
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform
+          config_file: .checkov.yaml
+          soft_fail: false
+
+      # ==================================================
+      # TRIVY
+      # ==================================================
+
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          format: table
+
+      # ==================================================
+      # TERRAFORM PLAN
+      # ==================================================
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform plan \
+            -input=false \
+            -no-color \
+            -out=tfplan
