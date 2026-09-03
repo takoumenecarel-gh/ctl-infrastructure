@@ -1,0 +1,26 @@
+name: AWS Authentication Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  aws-auth:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::351554785424:role/ctl-github-terraform-role
+          aws-region: us-east-1
+
+      - name: Verify AWS identity
+        run: |
+          aws sts get-caller-identity
