@@ -5,3 +5,8 @@ framework:
 
 skip-path:
   - .terraform
+
+skip-check:
+  - CKV2_AWS_62  # No S3 event consumer in dev
+  - CKV_AWS_18   # Access logging not required for dev test bucket
+  - CKV_AWS_144  # Cross-region DR not required for dev
